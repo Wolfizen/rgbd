@@ -3,9 +3,14 @@
 import os
 import sys
 import argparse
+import dbus
+
 
 class LightCTL:
 	def __init__(self):
+		self.dbus = None
+		self.args = None
+
 		self.parser = argparse.ArgumentParser()
 		commands = self.parser.add_subparsers(dest="command")
 
@@ -20,7 +25,7 @@ class LightCTL:
 		loadconf = commands.add_parser("load-conf")
 		loadconf.add_argument("path", type=str, help="Path of the conf file to hotload")
 		
-		reloadconf = commands.add_parser("reload-conf")
+		commands.add_parser("reload-conf")
 
 		deliver = commands.add_parser("deliver")
 		deliver.add_argument("zone", type=str, help="Name of the zone to pass status info to")
@@ -31,51 +36,46 @@ class LightCTL:
 		return self.args
 
 	def process_command(self):
-		import dbus, dbus.exceptions
 		try:
 			bus = dbus.SessionBus()
 			self.dbus = bus.get_object("fox.pandora.rgbd", "/fox/pandora/rgbd/lightctl")
 		except dbus.exceptions.DBusException as e:
-			print("Unable to initialize dbus connection. Please ensure the daemon is running with < command in the future >")
+			print("Unable to initialize dbus connection. Please ensure the daemon is running.")
 			sys.exit(2)
 
-		if (self.args.command == "set-brightness"):
+		if self.args.command == "set-brightness":
 			b = self.args.brightness_level
-			if (0 < b and b < 1):
+			if 0 < b < 1:
 				b = int(b*255)
-			elif (0 <= b and b < 256):
+			elif 0 <= b < 256:
 				b = int(b)
 			else:
 				print("Invalid brightness given!")
 				sys.exit(1)
 			self.dbus.brightness(b)
-			sys.exit(0)
 		
-		if (self.args.command == "set-pixel"):
+		elif self.args.command == "set-pixel":
 			z = self.args.zone
 			i = self.args.pos
 			col = self.args.color.lstrip("#")
 			self.dbus.setpixel(z, i, int(col, 16))
-			sys.exit(0)
 
-		if (self.args.command == "load-conf"):
+		elif self.args.command == "load-conf":
 			self.dbus.loadconf(os.path.abspath(self.args.path))
-			sys.exit(0)
 
-		if (self.args.command == "reload-conf"):
+		elif self.args.command == "reload-conf":
 			self.dbus.loadconf("")
-			sys.exit(0)
 
-		if (self.args.command == "deliver"):
+		elif self.args.command == "deliver":
 			self.dbus.deliver(self.args.zone, self.args.data)
-			sys.exit(0)
 
-		print(self.args)
-		self.parser.print_help()
-		sys.exit(1)
+		else:
+			print(self.args)
+			self.parser.print_help()
+			sys.exit(3)
 
 
-if (__name__ == "__main__"):
+if __name__ == "__main__":
 	"""🦊🍑🍆💦😩"""
 	lctl = LightCTL()
 	lctl.get_args()

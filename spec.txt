@@ -8,10 +8,3 @@ Base product reqs:
 * fading colors, and the math to go with that
 
 Light controller should be a daemon that's controllable over dbus.
-
-Everything is working.
-
-New plans:
-
-* Different animations on timers.
-* zsh/bash completions for ./installer, lightctl
