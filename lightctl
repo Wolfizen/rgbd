@@ -18,7 +18,7 @@ class LightCTL:
 		setpixel.add_argument("color", type=str, help="color of the pixel to set")
 
 		loadconf = commands.add_parser("load-conf")
-		loadconf.add_argument("path", help="Path of the conf file to hotload")
+		loadconf.add_argument("path", type=str, help="Path of the conf file to hotload")
 		
 		reloadconf = commands.add_parser("reload-conf")
 
@@ -59,7 +59,7 @@ class LightCTL:
 			sys.exit(0)
 
 		if (self.args.command == "load-conf"):
-			self.dbus.loadconf(self.args.path)
+			self.dbus.loadconf(os.path.abspath(self.args.path))
 			sys.exit(0)
 
 		if (self.args.command == "reload-conf"):
