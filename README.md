@@ -2,9 +2,7 @@
 
 ## Version 1.0.0!
 
-I'm writing a daemon for controlling my ws2812B RGB LED strips with my raspberry pi. Security is something of a concern, so this is written so as to never actually require root.
-
-The main purpose behind most of this is so that I can easily dim the brightness on the lights (or change the lighting patterns/mood) from my phone, in my bed. Really.
+This daemon is designed to control a WS2812B RGB LED strip via a Raspberry Pi. This daemon requires zero root privileges to run.
 
 Uses [rpi\_ws281x](https://github.com/jgarff/rpi_ws281x) and [colour](https://pypi.python.org/pypi/colour).
 
@@ -25,7 +23,8 @@ A 3.3V -> 5V voltage step is not required for the WS2812B, since (most) 2812B st
 
 ## Setup
 
-Install [rpi\_ws281x](https://github.com/jgarff/rpi_ws281x) and [colour](https://pypi.python.org/pypi/colour) (not strictly needed, but handy for animations). Make sure to follow the instructions for SPI as given in the `rpi_ws281x` repo.
+Build and install [rpi\_ws281x](https://github.com/jgarff/rpi_ws281x) and [colour](https://pypi.python.org/pypi/colour) (not strictly needed, but handy for animations). Make sure to follow the instructions for SPI as given in the `rpi_ws281x` repo.
+Don't forget to run the python library installer in the `rpi_ws281x/python/` directory!
 
 `rpi_ws281x` must be from at least [this commit](https://github.com/jgarff/rpi_ws281x/commit/d50cc444fa3a12bd8e2332ac5d1dd5e61b338e68) or newer, so that rootless SPI works.
 
@@ -41,7 +40,7 @@ You can specify a variety of options to the installer for where files get instal
 
 To use `lightctl`, make sure its install dir is in your `$PATH`. By default, it installs to `~/.local/bin`.
 
-You must be a member of the `gpio` group in order to run this code.
+You must be a member of the `gpio` and `spi` group in order to run this code.
 
 ## Usage
 
