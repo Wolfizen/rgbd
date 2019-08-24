@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 import time
+import traceback
 
 import dbus_listener
 import strip
@@ -42,11 +43,6 @@ class RGBd:
 		self.listener_thread = multiprocessing.Process(target=dbus_listener.Listener, args=(self.queue,), daemon=True)
 		self.listener_thread.start()
 
-		# bind signals
-		signal.signal(signal.SIGINT, self.cleanup)
-		signal.signal(signal.SIGTERM, self.cleanup)
-		signal.signal(signal.SIGHUP, self.reload)
-
 		print("Startup finished at {}".format(datetime.datetime.now()), flush=True)
 
 		while True:
@@ -65,6 +61,7 @@ class RGBd:
 		})
 
 	def cleanup(self, signum=None, frame=None):
+		# Unused arguments are from the signals module, this func is a registered signal handler.
 		if self.blank_on_exit and self.strip:
 			print("blanking...")
 			self.strip.blank_strip()
@@ -94,7 +91,17 @@ class RGBd:
 		# create pidfile
 		self._set_running_pid()
 
-		self.run()
+		# bind signals
+		signal.signal(signal.SIGINT, self.cleanup)
+		signal.signal(signal.SIGTERM, self.cleanup)
+		signal.signal(signal.SIGHUP, self.reload)
+
+		try:
+			self.run()
+		except Exception:
+			traceback.print_exc()
+
+		self.cleanup()
 
 	def stop(self, restart=False):
 		""" checks for pidfile; if exists, read the pid, send SIGTERM """
