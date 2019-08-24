@@ -1,11 +1,12 @@
 import animations.common as common
 
-"""Animation template
-Must have a parent class Anim, that has an __init__ and an iter() function"""
 
 class Anim:
+	"""Animation template.
+	Must have a parent class Anim, that has an __init__ and an iter() function"""
+
 	def __init__(self, length, func, config):
-		self.length
+		self.length = length
 		self.setpixel = func
 		self.conf = config
 

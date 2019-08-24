@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
+import getpass
 import json
 import multiprocessing
 import os
@@ -11,178 +12,117 @@ import time
 import dbus_listener
 import strip
 
+
 class RGBd:
 	def __init__(self, confpath):
-		self.confp = confpath
+		self.conf_path = confpath
 		self.conf = self.loadconf()
 
 		d_conf = self.conf.get("daemon", {})
-		# we never use STDIN ever again anyways... but this is tradition.
-		self.daemon_stdin   = d_conf.get("stdin",  os.devnull)
-		self.daemon_in_md   = d_conf.get("stdin_mode", "r")
+		self.master_pidfile = d_conf.get("pidfile", "/tmp/{}_rgbd.pid".format(getpass.getuser()))
+		self.blank_on_exit = d_conf.get("blank_on_exit", False)
 
-		self.daemon_stdout  = d_conf.get("stdout", os.devnull)
-		self.daemon_out_md  = d_conf.get("stdout_mode", "a")
-
-		self.daemon_stderr  = d_conf.get("stderr", os.devnull)
-		self.daemon_err_md  = d_conf.get("stderr_mode", "ab")
-
-		self.daemon_chdir   = d_conf.get("working_dir", "/")
-		self.daemon_pidfile = d_conf.get("pidfile", "/tmp/rgbd.pid")
-		self.blank_on_exit  = d_conf.get("blank_on_exit", False)
+		self.strip = None
+		self.queue = None
+		self.listener_thread = None
 
 	def loadconf(self):
-		with open(self.confp) as conf:
+		with open(self.conf_path) as conf:
 			return json.load(conf)
 
 	def run(self):
-		if (sys.version_info.major < 3):
+		if sys.version_info.major < 3:
 			raise Exception("must be running at least python 3")
-		if (os.getuid() == 0 or os.geteuid() == 0 or os.getgid() == 0):
-			raise Exception("This daemon should not be run as root due to security reasons.\nPlease control your ws281x using SPI instead of PWM.")
+		if os.getuid() == 0 or os.geteuid() == 0 or os.getgid() == 0:
+			raise Exception(
+				"This daemon should not be run as root due to security reasons.\nPlease control your ws281x using SPI "
+				"instead of PWM.")
 
 		self.queue = multiprocessing.Queue()
 		self.listener_thread = multiprocessing.Process(target=dbus_listener.Listener, args=(self.queue,), daemon=True)
 		self.listener_thread.start()
-		
+
+		# bind signals
+		signal.signal(signal.SIGINT, self.cleanup)
+		signal.signal(signal.SIGTERM, self.cleanup)
+		signal.signal(signal.SIGHUP, self.reload)
+
+		print("Startup finished at {}".format(datetime.datetime.now()), flush=True)
+
 		while True:
 			self.strip = strip.Strip(self.conf)
 			ret = self.strip.animate(self.queue)
-			if (ret != ""):
-				self.confp = ret
+			if ret != "":
+				self.conf_path = ret
 			self.conf = self.loadconf()
 
 	def reload(self):
 		self.queue.put({
 			"command": "loadconf",
 			"data": {
-				"path": self.confp
+				"path": self.conf_path
 			}
 		})
 
 	def cleanup(self, signum=None, frame=None):
-		if (self.blank_on_exit and self.strip):
+		if self.blank_on_exit and self.strip:
 			print("blanking...")
 			self.strip.blank_strip()
 		os.kill(self.listener_thread.pid, signal.SIGINT)
 		self.listener_thread.join(timeout=0.25)
 
-		if (self.listener_thread.is_alive()):
+		if self.listener_thread.is_alive():
 			os.kill(self.listener_thread.pid, signal.SIGKILL)
 			print("Had to SIGKILL child - pretty bad; potential orphans")
 
 		# done with cleanup - we can let other processes proceed now
-		try:
-			os.remove(self.daemon_pidfile)
-		except FileNotFoundError as e:
-			pass
+		self._clear_running_pid()
 
 		print("rgbd exited successfully at {}".format(datetime.datetime.now()))
-		sys.stdin.close()
-		sys.stdout.close()
-		sys.stderr.close()
 		sys.exit(0)
 
-	"""
-		daemonization code adapted from
-		http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
-	"""
-
-	def daemonize(self):
-		# first of the double fork
-		try:
-			pid = os.fork()
-			if (pid > 0):
-				sys.exit(0)
-		except OSError as e:
-			sys.stderr.write("first fork failed: {}\n".format(str(e)))
-			sys.exit(1)
-
-		os.chdir(self.daemon_chdir)
-		os.setsid()
-		os.umask(0)
-		# second fork magic
-		try:
-			pid = os.fork()
-			if (pid > 0):
-				sys.exit(0)
-		except OSError as e:
-			sys.stderr.write("second fork failed: {}\n".format(str(e)))
-			sys.exit(1)
-
-		# redirect stdout/stderr
-		sys.stdout.flush()
-		sys.stderr.flush()
-
-		stdin  = open(self.daemon_stdin,  self.daemon_in_md )
-		stdout = open(self.daemon_stdout, self.daemon_out_md)
-		stderr = open(self.daemon_stderr, self.daemon_err_md, 0)
-
-		os.dup2(stdin.fileno(),  sys.stdin.fileno())
-		os.dup2(stdout.fileno(), sys.stdout.fileno())
-		os.dup2(stderr.fileno(), sys.stderr.fileno())
-
-		# bind signals
-		signal.signal(signal.SIGINT,  self.cleanup)
-		signal.signal(signal.SIGTERM, self.cleanup)
-		signal.signal(signal.SIGHUP,  self.reload )
-
-		# create pidfile
-		with open(self.daemon_pidfile, "w") as pidf:
-			pidf.write("{}\n".format(os.getpid()))
-
-		print("Daemonization finished at {}".format(datetime.datetime.now()))
-
 	def start(self):
-		""" check for pidfile, if not exists, daemonize(), run() """
-		try:
-			with open(self.daemon_pidfile, "r") as pidf:
-				pid = int(pidf.read().strip())
-		except FileNotFoundError as e:
-			pid = None
+		""" check for pidfile, if not exists, run() """
+		pid = self._get_running_pid()
 
 		if pid:
-			sys.stderr.write("pidfile exists with value {}. There is either a daemon already running, or a daemon crashed and didn't clean up.\n".format(pid))
+			sys.stderr.write(
+				"pidfile ({}) exists with value {}. There is either a daemon already running, or a daemon crashed and "
+				"didn't clean up.\n".format(self.master_pidfile, pid))
 			sys.exit(1)
 
-		self.daemonize()
+		# create pidfile
+		self._set_running_pid()
+
 		self.run()
-		pass
 
 	def stop(self, restart=False):
 		""" checks for pidfile; if exists, read the pid, send SIGTERM """
-		try:
-			with open(self.daemon_pidfile, "r") as pidf:
-				pid = int(pidf.read().strip())
-		except FileNotFoundError as e:
-			pid = None
+		pid = self._get_running_pid()
 
-		if (not pid):
-			if (os.path.exists(self.daemon_pidfile)):
-				os.remove(self.daemon_pidfile)
-			if (restart):
+		if not pid:
+			self._clear_running_pid()
+			if restart:
 				return
 			sys.stderr.write("No pid found when stopping - daemon not running?\n")
 			return
 		# try to kill existing process / wipe out lockfile
-		isalive = True
 		try:
 			os.kill(pid, signal.SIGTERM)
 			time.sleep(0.3)
-			isalive = (os.kill(pid, 0) == None)
-		except ProcessLookupError as e:
-			isalive = False
+			is_alive = (os.kill(pid, 0) is None)
+		except ProcessLookupError:
+			is_alive = False
 		# maybe not catch this error and let it just raise()?
-		except PermissionError as e:
+		except PermissionError:
 			sys.stderr.write("Unable to kill existing process with pid {}.\n".format(pid))
 			sys.exit(1)
 
-		if (isalive):
+		if is_alive:
 			sys.stderr.write("Daemon didn't exit in time - possibly hung?\n")
 			sys.exit(1)
 		else:
-			if (os.path.exists(self.daemon_pidfile)):
-				os.remove(self.daemon_pidfile)
+			self._clear_running_pid()
 		return
 
 	def restart(self):
@@ -190,23 +130,50 @@ class RGBd:
 		self.stop(True)
 		self.start()
 
+	def _get_running_pid(self):
+		"""Reads the pidfile and returns its contents, else None."""
+		try:
+			with open(self.master_pidfile, "r") as pidf:
+				return int(pidf.read().strip())
+		except FileNotFoundError:
+			return None
 
-if (__name__ == "__main__"):
+	def _set_running_pid(self):
+		"""Write to the pidfile with the current process's PID."""
+		with open(self.master_pidfile, "w") as pidf:
+			pidf.write("{}\n".format(os.getpid()))
+
+	def _clear_running_pid(self):
+		"""Delete the pidfile."""
+		if os.path.exists(self.master_pidfile):
+			os.remove(self.master_pidfile)
+
+
+if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	commands = parser.add_subparsers(dest="command")
 
 	stop_cmd = commands.add_parser("stop")
-	stop_cmd.add_argument("-c", "--config", help="give a new config file for the currently-running daemon to use", default="~/.config/rgbd/config.json")
+	stop_cmd.add_argument(
+		"-c", "--config",
+		help="give a new config file for the currently-running daemon to use",
+		default="~/.config/rgbd/config.json")
 
 	start_cmd = commands.add_parser("start")
-	start_cmd.add_argument("-c", "--config", help="give a new config file for the currently-running daemon to use", default="~/.config/rgbd/config.json")
+	start_cmd.add_argument(
+		"-c", "--config",
+		help="give a new config file for the currently-running daemon to use",
+		default="~/.config/rgbd/config.json")
 
 	restart_cmd = commands.add_parser("restart")
-	restart_cmd.add_argument("-c", "--config", help="give a new config file for the currently-running daemon to use", default="~/.config/rgbd/config.json")
+	restart_cmd.add_argument(
+		"-c", "--config",
+		help="give a new config file for the currently-running daemon to use",
+		default="~/.config/rgbd/config.json")
 
 	args = parser.parse_args()
 
-	if (args.command):
+	if args.command:
 		cfg_path = os.path.abspath(os.path.expanduser(args.config))
 		daemon = RGBd(cfg_path)
 

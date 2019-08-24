@@ -1,5 +1,6 @@
 import animations.common as common
 
+
 class Anim:
 	def __init__(self, length, func, config):
 		self.length = length
@@ -10,4 +11,3 @@ class Anim:
 	def iter(self):
 		for i in range(self.length):
 			self.setpixel(i, self.color)
-

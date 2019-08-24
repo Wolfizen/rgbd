@@ -13,9 +13,9 @@ class Anim:
 		self.color = common.from_hex(self.conf.get("color", "#ff00ff"))
 		self.text = self.conf.get("text")
 		self.iters = 0
-		self.blink_pattern = self.to_morse_blinks()
+		self.blink_pattern = self._to_morse_blinks()
 
-	def to_morse_blinks(self):
+	def _to_morse_blinks(self):
 		morse_map = {
 			"a": ".-",
 			"b": "-...",
@@ -83,13 +83,13 @@ class Anim:
 		answer = []
 		for letter in self.text:
 			morse_str = morse_map.get(letter)
-			if (morse_str == "/"):
+			if morse_str == "/":
 				answer += ([False] * 7)
-			elif (morse_str != None):
+			elif morse_str is not None:
 				for char in morse_str:
-					if (char == "."):
+					if char == ".":
 						answer.append(True)
-					elif (char == "-"):
+					elif char == "-":
 						answer += ([True] * 3)
 					answer.append(False)
 				answer.append(False)
@@ -99,7 +99,7 @@ class Anim:
 		return answer
 
 	def iter(self):
-		if (self.blink_pattern[self.iters]):
+		if self.blink_pattern[self.iters]:
 			col = self.color
 		else:
 			col = 0

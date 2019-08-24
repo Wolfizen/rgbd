@@ -3,13 +3,13 @@ import gi.repository.GLib
 import sys
 import signal
 
+
 class Handler(dbus.service.Object):
 	def __init__(self, queue, bus_name):
 		super().__init__(bus_name, "/fox/pandora/rgbd/lightctl")
 		self.queue = queue
 
-	@dbus.service.method("fox.pandora.rgbd.lightctl",
-			in_signature="ss", out_signature="b")
+	@dbus.service.method("fox.pandora.rgbd.lightctl", in_signature="ss", out_signature="b")
 	def deliver(self, zone_name, message):
 		print("received deliver command: {} => {}".format(message, zone_name))
 		self.queue.put({
@@ -21,8 +21,7 @@ class Handler(dbus.service.Object):
 		})
 		return True
 
-	@dbus.service.method("fox.pandora.rgbd.lightctl",
-		in_signature="sii", out_signature="b")
+	@dbus.service.method("fox.pandora.rgbd.lightctl", in_signature="sii", out_signature="b")
 	def setpixel(self, zone_name, pos, color):
 		print("received setpixel: {} {}".format(pos, color))
 		self.queue.put({
@@ -35,8 +34,7 @@ class Handler(dbus.service.Object):
 		})
 		return True
 
-	@dbus.service.method("fox.pandora.rgbd.lightctl",
-		in_signature="s", out_signature="b")
+	@dbus.service.method("fox.pandora.rgbd.lightctl", in_signature="s", out_signature="b")
 	def loadconf(self, confpath):
 		print("received conf reload: {}".format(confpath))
 		self.queue.put({
@@ -47,8 +45,7 @@ class Handler(dbus.service.Object):
 		})
 		return True
 
-	@dbus.service.method("fox.pandora.rgbd.lightctl",
-		in_signature="y", out_signature="b")
+	@dbus.service.method("fox.pandora.rgbd.lightctl", in_signature="y", out_signature="b")
 	def brightness(self, input_brightness):
 		print("received brightness adjustment: {}".format(input_brightness))
 		self.queue.put({
@@ -59,7 +56,8 @@ class Handler(dbus.service.Object):
 		})
 		return True
 
-class Listener():
+
+class Listener:
 	def __init__(self, queue):
 		self.queue = queue
 		dbus_loop = dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)

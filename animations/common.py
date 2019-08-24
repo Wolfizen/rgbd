@@ -1,19 +1,23 @@
 import colour
 
-""" returns an int representing an rgb combination; 0-255 each """
-def rgb(r, g, b):
-    return (r << 16) + (g << 8) + (b)
 
-""" returns an int like above, from a Color object """
+def rgb(red, green, blue):
+    """ returns an int representing an rgb combination; 0-255 each """
+    return (red << 16) + (green << 8) + blue
+
+
 def from_colour(col):
+    """ returns an int like above, from a Color object """
     return int(col.hex_l[1:], 16)
 
-""" returns int val from a hex string (must be rrggbb, not rgb) """
+
 def from_hex(col_str):
-    if (col_str[0] == "#"):
+    """ returns int val from a hex string (must be rrggbb, not rgb) """
+    if col_str[0] == "#":
         col_str = col_str[1:]
     return int(col_str, 16)
 
-""" color wheel stuffs """
+
 def col_wheel(pos, size):
+    """ color wheel stuffs """
     return from_colour(colour.Color(hsl=(pos/size, 1, 0.5)))

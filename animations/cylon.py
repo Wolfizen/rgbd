@@ -3,8 +3,9 @@ import animations.common as common
 from colour import Color
 
 
-"""Cylon style light pulsing forwards and back"""
 class Anim:
+	"""Cylon style light pulsing forwards and back"""
+
 	iters = 0
 	forwards = True
 
@@ -17,10 +18,10 @@ class Anim:
 		self.atonce = config.get("at_once", 1)
 
 		if self.fade:
-			self.gen_colors(config.get("color", "#ff00ff"))
+			self.colors = self._gen_colors(config.get("color", "#ff00ff"))
 
-	def gen_colors(self, cfg_color):
-		self.colors = [self.color]
+	def _gen_colors(self, cfg_color):
+		colors = [self.color]
 
 		if self.atonce == 1:
 			return
@@ -30,7 +31,9 @@ class Anim:
 		color = Color(cfg_color)
 		for dist in range(1, needed + 1):
 			color.luminance = color.luminance / ((dist + 1)**2)
-			self.colors.append(common.from_colour(color))
+			colors.append(common.from_colour(color))
+
+		return colors
 
 	def iter(self):
 		if self.iters >= self.length - 1:

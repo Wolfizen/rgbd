@@ -1,12 +1,13 @@
 [Unit]
-Description=Daemon for controlling an RGB strip.
+Description=rgbd, a daemon for controlling an RGB strip.
 Wants=dbus.service
 
 [Service]
-type=forking
+Type=exec
 PIDFile=/tmp/rgbd.pid
 ExecStart=%h/.local/share/rgbd/daemon/rgbd start --config %h/.config/rgbd/%i.json
 ExecStop=%h/.local/share/rgbd/daemon/rgbd stop --config %h/.config/rgbd/%i.json
+KillMode=mixed
 
 [Install]
 Alias=rgbd.target

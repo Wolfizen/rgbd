@@ -3,10 +3,10 @@ import json
 from animations.common import from_hex
 
 _DEFAULT_STATES = {
-    'UNKNOWN': from_hex('#778899'),
-    'GOOD': from_hex('#00ff00'),
-    'WARNING': from_hex('#ffff00'),
-    'DANGER': from_hex('#ff0000'),
+	'UNKNOWN': from_hex('#778899'),
+	'GOOD': from_hex('#00ff00'),
+	'WARNING': from_hex('#ffff00'),
+	'DANGER': from_hex('#ff0000'),
 }
 
 
