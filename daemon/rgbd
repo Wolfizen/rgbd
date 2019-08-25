@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import atexit
 import datetime
 import getpass
 import json
@@ -10,13 +11,15 @@ import sys
 import time
 import traceback
 
+# Local imports for other rgbd code
 import dbus_listener
 import strip
 
 
 class RGBd:
-	def __init__(self, confpath):
-		self.conf_path = confpath
+	def __init__(self, conf_path, test_mode=False):
+		self.conf_path = conf_path
+		self.test_mode = test_mode
 		self.conf = self.loadconf()
 
 		d_conf = self.conf.get("daemon", {})
@@ -25,7 +28,8 @@ class RGBd:
 
 		self.strip = None
 		self.queue = None
-		self.listener_thread = None
+		self.listener_process = None
+		self.cleaned_up = False
 
 	def loadconf(self):
 		with open(self.conf_path) as conf:
@@ -40,14 +44,20 @@ class RGBd:
 				"instead of PWM.")
 
 		self.queue = multiprocessing.Queue()
-		self.listener_thread = multiprocessing.Process(target=dbus_listener.Listener, args=(self.queue,), daemon=True)
-		self.listener_thread.start()
+		self.listener_process = multiprocessing.Process(target=dbus_listener.Listener, args=(self.queue,), daemon=True)
+		self.listener_process.start()
 
 		print("Startup finished at {}".format(datetime.datetime.now()), flush=True)
 
 		while True:
-			self.strip = strip.Strip(self.conf)
+			if self.test_mode:
+				import test_strip
+				self.strip = test_strip.TestingStrip(self.conf)
+			else:
+				self.strip = strip.Strip(self.conf)
+
 			ret = self.strip.animate(self.queue)
+
 			if ret != "":
 				self.conf_path = ret
 			self.conf = self.loadconf()
@@ -60,26 +70,32 @@ class RGBd:
 			}
 		})
 
-	def cleanup(self, signum=None, frame=None):
+	def cleanup(self, signum=None, frame=None, exit_code=0):
 		# Unused arguments are from the signals module, this func is a registered signal handler.
+		if self.cleaned_up:
+			return
+		self.cleaned_up = True
+
 		if self.blank_on_exit and self.strip:
 			print("blanking...")
 			self.strip.blank_strip()
-		os.kill(self.listener_thread.pid, signal.SIGINT)
-		self.listener_thread.join(timeout=0.25)
-
-		if self.listener_thread.is_alive():
-			os.kill(self.listener_thread.pid, signal.SIGKILL)
-			print("Had to SIGKILL child - pretty bad; potential orphans")
+		if self.listener_process:
+			os.kill(self.listener_process.pid, signal.SIGINT)
+			self.listener_process.join(timeout=0.25)
+			if self.listener_process.is_alive():
+				os.kill(self.listener_process.pid, signal.SIGKILL)
+				print("Had to SIGKILL child - pretty bad; potential orphans")
 
 		# done with cleanup - we can let other processes proceed now
 		self._clear_running_pid()
 
-		print("rgbd exited successfully at {}".format(datetime.datetime.now()))
-		sys.exit(0)
+		print("rgbd exited {} at {}".format(
+			"successfully" if exit_code is 0 else "unsuccessfully ({})".format(exit_code),
+			datetime.datetime.now()))
+		sys.exit(exit_code)
 
 	def start(self):
-		""" check for pidfile, if not exists, run() """
+		"""Check pidfile, register signal handlers, wrap run()."""
 		pid = self._get_running_pid()
 
 		if pid:
@@ -95,16 +111,21 @@ class RGBd:
 		signal.signal(signal.SIGINT, self.cleanup)
 		signal.signal(signal.SIGTERM, self.cleanup)
 		signal.signal(signal.SIGHUP, self.reload)
+		atexit.register(self.cleanup)
 
 		try:
-			self.run()
+			if self.test_mode:
+				import test_strip
+				test_strip.TestingStrip.setup_window(self.run)
+			else:
+				self.run()
+			self.cleanup()
 		except Exception:
 			traceback.print_exc()
-
-		self.cleanup()
+			self.cleanup(exit_code=1)
 
 	def stop(self, restart=False):
-		""" checks for pidfile; if exists, read the pid, send SIGTERM """
+		"""checks for pidfile; if exists, read the pid, send SIGTERM"""
 		pid = self._get_running_pid()
 
 		if not pid:
@@ -120,7 +141,6 @@ class RGBd:
 			is_alive = (os.kill(pid, 0) is None)
 		except ProcessLookupError:
 			is_alive = False
-		# maybe not catch this error and let it just raise()?
 		except PermissionError:
 			sys.stderr.write("Unable to kill existing process with pid {}.\n".format(pid))
 			sys.exit(1)
@@ -133,8 +153,8 @@ class RGBd:
 		return
 
 	def restart(self):
-		""" ez """
-		self.stop(True)
+		"""ez"""
+		self.stop(restart=True)
 		self.start()
 
 	def _get_running_pid(self):
@@ -156,36 +176,55 @@ class RGBd:
 			os.remove(self.master_pidfile)
 
 
-if __name__ == "__main__":
+def main():
 	parser = argparse.ArgumentParser()
 	commands = parser.add_subparsers(dest="command")
 
 	stop_cmd = commands.add_parser("stop")
 	stop_cmd.add_argument(
 		"-c", "--config",
-		help="give a new config file for the currently-running daemon to use",
+		type=str,
+		help="the config file to use",
 		default="~/.config/rgbd/config.json")
+	stop_cmd.add_argument(
+		"--test",
+		action="store_true",
+		help="run the strip in testing mode, emulating via a graphical window")
 
 	start_cmd = commands.add_parser("start")
 	start_cmd.add_argument(
 		"-c", "--config",
-		help="give a new config file for the currently-running daemon to use",
+		type=str,
+		help="the config file to use",
 		default="~/.config/rgbd/config.json")
+	start_cmd.add_argument(
+		"--test",
+		action="store_true",
+		help="run the strip in testing mode, emulating via a graphical window")
 
 	restart_cmd = commands.add_parser("restart")
 	restart_cmd.add_argument(
 		"-c", "--config",
-		help="give a new config file for the currently-running daemon to use",
+		type=str,
+		help="give a new config file to use",
 		default="~/.config/rgbd/config.json")
+	restart_cmd.add_argument(
+		"--test",
+		action="store_true",
+		help="run the strip in testing mode, emulating via a graphical window")
 
 	args = parser.parse_args()
 
 	if args.command:
 		cfg_path = os.path.abspath(os.path.expanduser(args.config))
-		daemon = RGBd(cfg_path)
+		daemon = RGBd(cfg_path, test_mode=args.test if "test" in args else False)
 
 		getattr(daemon, args.command)()
 		sys.exit(0)
 	else:
 		parser.print_help()
 		sys.exit(0)
+
+
+if __name__ == "__main__":
+	main()

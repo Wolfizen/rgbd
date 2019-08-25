@@ -1,0 +1,5 @@
+# Install for running the strip on hardware. Don't forget common requirements!
+
+# Must install from source.
+#neopixel
+#rpi_ws281x

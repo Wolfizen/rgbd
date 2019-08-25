@@ -1,0 +1,2 @@
+# Install for strip testing in dev environment. Don't forget common requirements!
+PyQt5==5.13.0

@@ -1,13 +1,10 @@
 {
 	"daemon": {
-		"stdout": "/tmp/rgbd.stdout",
-		"stdout_mode": "w",
-		"stderr": "/tmp/rgbd.stderr",
-		"stderr_mode": "ab",
+		"pidfile":	"/tmp/rgbd.pid",
 		"blank_on_exit": true
 	},
 	"strip_config": {
-		"count":	421,
+		"count":	350,
 		"pin":		10,
 		"freq":		800000,
 		"DMA":		10,
@@ -20,7 +17,7 @@
 	"zones": [
 		{
 			"name":		"monitor 1",
-			"length":	421,
+			"length":	100,
 			"animation":	"rainbow",
 			"animation_config": {
 				"fade_as_whole": true,
@@ -31,7 +28,7 @@
 		},
 		{
 			"name":		"monitor 2",
-			"length":	0,
+			"length":	100,
 			"animation":	"morse",
 			"animation_config": {
 				"color": "#ff3300",
@@ -41,14 +38,14 @@
 		},
 		{
 			"name":		"under desk",
-			"length":	0,
+			"length":	50,
 			"animation":	"blank",
 			"allow_dbus":	true,
 			"step_delay":	250
 		},
 		{
 			"name":		"behind desk",
-			"length":	0,
+			"length":	50,
 			"animation":	"solid",
 			"animation_config": {
 				"color": "#880088"
@@ -58,7 +55,7 @@
 		},
 		{
 			"name":		"under shelf",
-			"length":	0,
+			"length":	50,
 			"animation":	"fade",
 			"animation_config": {
 				"colors": [

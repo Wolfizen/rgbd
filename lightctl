@@ -15,7 +15,9 @@ class LightCTL:
 		commands = self.parser.add_subparsers(dest="command")
 
 		brightness_cmd = commands.add_parser("set-brightness")
-		brightness_cmd.add_argument("brightness_level", type=float, help="set the brightness of the strip to a value from 0 to 255 (Floats between 0 and 1 are also fine)")
+		brightness_cmd.add_argument(
+			"brightness_level", type=float,
+			help="set the brightness of the strip to a value from 0 to 255 (Floats between 0 and 1 are also fine)")
 		
 		setpixel = commands.add_parser("set-pixel")
 		setpixel.add_argument("zone", type=str, help="name of the zone to set pixel in")
@@ -39,7 +41,7 @@ class LightCTL:
 		try:
 			bus = dbus.SessionBus()
 			self.dbus = bus.get_object("fox.pandora.rgbd", "/fox/pandora/rgbd/lightctl")
-		except dbus.exceptions.DBusException as e:
+		except dbus.exceptions.DBusException:
 			print("Unable to initialize dbus connection. Please ensure the daemon is running.")
 			sys.exit(2)
 
@@ -76,7 +78,6 @@ class LightCTL:
 
 
 if __name__ == "__main__":
-	"""🦊🍑🍆💦😩"""
 	lctl = LightCTL()
 	lctl.get_args()
 	lctl.process_command()

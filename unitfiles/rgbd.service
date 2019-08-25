@@ -8,7 +8,7 @@ PIDFile=/tmp/rgbd.pid
 ExecStart=%h/.local/share/rgbd/daemon/rgbd start --config %h/.config/rgbd/config.json
 ExecStop=%h/.local/share/rgbd/daemon/rgbd stop --config %h/.config/rgbd/config.json
 KillMode=mixed
-Restart=on-success
+Restart=on-failure
 
 [Install]
 Alias=rgbd.target

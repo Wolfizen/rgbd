@@ -1,9 +1,6 @@
 {
 	"daemon": {
-		"stdout": "/tmp/rgbd.stdout",
-		"stdout_mode": "w",
-		"stderr": "/tmp/rgbd.stderr",
-		"stderr_mode": "ab"
+		"blank_on_exit": true
 	},
 	"strip_config": {
 		"count":	421,
@@ -13,11 +10,8 @@
 		"brightness":	128,
 		"invert":	false,
 		"channel":	0,
-		"strip":	"ws281x",
-		"anim_dir":	"",
-		"blank_on_exit": true
+		"strip":	"ws281x"
 	},
-	"animations_path": "~/.local/share/rgbd/animations",
 	"zones": [
 		{
 			"name":		"blank",

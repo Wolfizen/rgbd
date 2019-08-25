@@ -2,8 +2,6 @@ import importlib
 import os
 import sys
 import time
-# must have installed rpi_ws281x
-import neopixel
 
 
 class BlankAnim:
@@ -21,8 +19,8 @@ class BlankAnim:
 class Zone:
 	""" defines a segment of pixels, from offset to offset+length, for an animation to run on """
 
-	def __init__(self, strip, offset, anim_class, zone_conf):
-		self.strip = strip
+	def __init__(self, strip_backend, offset, anim_class, zone_conf):
+		self.strip_backend = strip_backend
 		self.offset = offset
 		self.conf = zone_conf
 		self.length = self.conf["length"]
@@ -40,8 +38,8 @@ class Zone:
 
 	def setpixel(self, i, color):
 		if i < 0 or i > (self.length - 1):
-			raise Exception("Invalid index for setpixel")
-		self.strip.setPixelColor(i + self.offset, color)
+			raise ValueError("Invalid index for setpixel")
+		self.strip_backend.setPixelColor(i + self.offset, color)
 
 	def iter(self):
 		self.anim.iter()
@@ -71,11 +69,13 @@ class Strip:
 		self.setup_zones()
 
 	def setup_strip(self):
+		import neopixel
 		brightness = self.strip_conf.get("brightness")
 		if 0 < brightness < 1:
 			brightness = int(brightness * 255)
 		strip_type = self.strip_conf.get("strip")
 		if strip_type == "ws281x":
+			# must have installed rpi_ws281x
 			strip_type = neopixel.ws.WS2811_STRIP_GRB
 		strip = neopixel.Adafruit_NeoPixel(
 			self.strip_conf.get("count"),
@@ -91,7 +91,6 @@ class Strip:
 		return strip
 
 	def load_anim_class(self, name):
-		# name = name.lower() # maybe I shouldn't do this?
 		if name == "blank":
 			ans = self.blank
 		else:
@@ -217,8 +216,6 @@ class Strip:
 						zone.delay_rem = 0
 						zone.draw = True
 		else:
-			# all animations are currently static
-			# however, I might eventually have to change this if I do the "different animations based off wall-clock time" stuff
-			print("No animations to animate - exiting, I guess")
-			# with it being a daemon, it should wait for a message over dbus
-			sys.exit(1)
+			# No zones require updating. Sleep for a bit, then wake up.
+			# Can't sleep forever, dbus messages need to be checked.
+			time.sleep(0.5)
