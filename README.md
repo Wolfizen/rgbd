@@ -1,7 +1,5 @@
 # RGBD
 
-## Version 1.0.0!
-
 This daemon is designed to control a WS2812B RGB LED strip via a Raspberry Pi. This daemon requires zero root privileges to run.
 
 Uses [rpi\_ws281x](https://github.com/jgarff/rpi_ws281x) and [colour](https://pypi.python.org/pypi/colour).
@@ -30,11 +28,9 @@ Don't forget to run the python library installer in the `rpi_ws281x/python/` dir
 
 ## Installing
 
-```
-git clone https://github.com/pandorasfox/rgbd && cd rgbd
-chmod +x ./installer
-./installer install all
-```
+* Clone the repo.
+* Install the libraries you are missing. Most definitely youll need to install the ws281x library.
+* Run the `installer` program. For basic full-install, run `./installer install all`.
 
 You can specify a variety of options to the installer for where files get installed to.
 
@@ -62,3 +58,7 @@ This left me with a few options:
 The last option was the best, but required a decent amount of setup to get right.
 
 If you want the script to persist beyond your session, then you _will_ need `sudo` rights to set some loginctl stuff, but that's it. For all regular usage, it can just stay running as a user daemon without any need for elevated permissions, ever.
+
+## Additional Software
+
+You might want to check out [LED-Dashboard](https://github.com/Wolfizen/LED-Dashboard), a web server that runs on the pi that controls the `rgbd` daemon.
